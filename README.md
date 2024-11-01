@@ -1,26 +1,37 @@
-# Terraform template for AWS
+# Terraform template for AWS REACT Webapp
 
-Name: aws-terraform-template
+Name: aws-terraform-react-webapp-template
+
+## AWS credentials
+
+Set region for Application
+
+``` export AWS_REGION=eu-central-1 ```
+
+Set profile
+
+``` export AWS_PROFILE="react-develop" ```
+
+Profile example:
+
+```
+[profile react-develop]
+sso_session = aiclouds
+sso_account_id = {{ AccountId }}
+sso_role_name = AdministratorAccess
+region = eu-central-1
+```
 
 ## Terraform
 
 ### Init
 
-``` export TF_VAR_region=us-east-1 ``` 
-or
-``` tf init --backend-config region=us-east-1 ```
+``` tf init ```
 
 ### Plan
 
-```
-export AWS_PROFILE="sso-profile"
-terraform plan
-```
+``` terraform plan ```
 
 ### Apply
 
 ``` tf apply -auto-approve ```
-
-### Update stages cashe
-
-``` tf show | tee Artifacts/stage1.tfstate ```
