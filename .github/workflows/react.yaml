@@ -1,0 +1,75 @@
+name: "REACT Build&Deploy"
+
+on:
+  workflow_call:
+    inputs:
+      working_directory:
+        required: true
+        type: string
+      root_bucket_name:
+        required: true
+        type: string
+      static_bucket_name:
+        required: true
+        type: string
+      aws_account_id:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: "${{ inputs.working_directory }}"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          audience: ${{ vars.AUDIENCE }}
+          aws-region: ${{ vars.AWS_CORE_REGION }}
+          role-to-assume: ${{ secrets.AWS_PRINCIPAL_ROLE_INFRA }}
+          retry-max-attempts: 5
+          mask-aws-account-id: "no"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        # working-directory: ${{ inputs.working_directory }}
+        run: npm install
+
+      - name: Run tests
+        # working-directory: ${{ inputs.working_directory }}
+        run: npm test
+
+      - name: Build
+        # working-directory: ${{ inputs.working_directory }}
+        run: npm run build
+
+      - name: Deploy to AWS S3
+        if: success()
+        run: |
+          set -e
+          eval $(aws sts assume-role \
+            --role-arn arn:aws:iam::${{ inputs.aws_account_id }}:role/projectTerraformAdminRole \
+            --role-session-name=GitHubActions \
+            --query 'join(``, [`export `, `AWS_ACCESS_KEY_ID=`, 
+                    Credentials.AccessKeyId, ` ; export `, `AWS_SECRET_ACCESS_KEY=`,
+                    Credentials.SecretAccessKey, `; export `, `AWS_SESSION_TOKEN=`,
+                    Credentials.SessionToken])' \
+            --output text)
+
+          echo "Copy public bucket ${{ inputs.root_bucket_name }}"
+          find ./build -maxdepth 1 -type f -exec aws s3 cp {} s3://${{ inputs.root_bucket_name }} \;
+
+          echo "Copy static bucket ${{ inputs.static_bucket_name }}"
+          aws s3 sync ./build/static s3://${{ inputs.static_bucket_name }}

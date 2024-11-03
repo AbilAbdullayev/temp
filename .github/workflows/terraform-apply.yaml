@@ -1,0 +1,93 @@
+# Deploy TF configuration (full)(specific)
+# rev: v2
+
+name: "Terraform Apply"
+
+on:
+  workflow_call:
+    inputs:
+      working_directory:
+        required: true
+        type: string
+      aws_account:
+        required: true
+        type: string
+    outputs:
+      aws_account_id:
+        description: "AWS Project account ID"
+        value: ${{ jobs.terraform.outputs.account_id }}
+      root_bucket_name:
+        description: "S3 bucket name"
+        value: ${{ jobs.terraform.outputs.bucket_name }}
+      static_bucket_name:
+        description: "S3 bucket name"
+        value: ${{ jobs.terraform.outputs.bucket_name }}
+
+env:
+  AWS_ACCOUNT: ${{ input.aws_account }}
+  TF_WORKSPACE: ${{ github.ref_name }}
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: "${{ inputs.working_directory }}"
+
+    # Job artifacts
+    outputs:
+      account_id: ${{ steps.account_id.outputs.account_id }}
+      root_bucket_name: ${{ steps.root_bucket_name.outputs.bucket_name }}
+      static_bucket_name: ${{ steps.static_bucket_name.outputs.bucket_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # 2ref: with local input variables
+          audience: ${{ vars.AUDIENCE }}
+          aws-region: ${{ vars.AWS_REGION_INFRA }}
+          role-to-assume: ${{ secrets.AWS_PRINCIPAL_ROLE_INFRA }}
+          retry-max-attempts: 5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format(linter)
+        continue-on-error: false
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        run: terraform plan -input=false
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
+
+      - name: Get root bucket name
+        id: root_bucket_name
+        run: |
+          NAME=$(terraform output -raw aws_root_bucket_name)
+          echo "Bucket name for public contents is ${NAME}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "bucket_name=${NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Get static bucket name
+        id: static_bucket_name
+        run: |
+          NAME=$(terraform output -raw aws_static_bucket_name)
+          echo "Bucket name for static content is ${NAME}" >> "$GITHUB_STEP_SUMMARY"
+          echo "::set-output name=bucket_name::$NAME"
+
+      - name: Get account ID
+        id: aws_account_id
+        run: |
+          AID=$(terraform output -raw aws_account_id)
+          echo "::add-mask::$AID"
+          echo "::set-output name=account_id::$AID"

@@ -1,0 +1,29 @@
+name: test
+
+on:
+  workflow_call:
+    inputs:
+      test_name:
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: "${{ inputs.test_name }} env"
+        run: |
+          echo "Test: ${{ inputs.test_name }}"
+          echo "------------------------"
+          echo GITHUB_REPOSITORY=$GITHUB_REPOSITORY
+          echo GITHUB_SHA=$GITHUB_SHA
+          echo GITHUB_REF=$GITHUB_REF
+          echo GITHUB_WORKFLOW=$GITHUB_WORKFLOW
+          echo GITHUB_ACTOR=$GITHUB_ACTOR
+          echo GITHUB_WORKSPACE=$GITHUB_WORKSPACE

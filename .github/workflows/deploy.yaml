@@ -1,0 +1,96 @@
+# Secrets:
+#   AWS_ACCOUNT_INFRA
+#   AWS_PRINCIPAL_ROLE_INFRA
+# Variables:
+#   AUDIENCE:
+#   AWS_REGION:
+#   AWS_REGION_INFRA:
+
+name: "Deploy"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - develop
+      - stage
+  pull_request:
+    branches:
+      - stage
+
+permissions:
+  contents: read
+
+env:
+  AWS_ACCOUNT: ${{ secrets.AWS_ACCOUNT_INFRA }} # 2ref: change variable name
+  TF_WORKSPACE: ${{ github.ref_name }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Job1
+  test:
+    name: "Test"
+    if: true
+
+    strategy:
+      matrix:
+        test_name: ["Test1", "Test2"]
+
+    uses: ./.github/workflows/test.yaml
+    with:
+      test_name: ${{ matrix.test_name }}
+    secrets: inherit
+
+  # Job2
+  infra:
+    # name: "Env ${{ github.ref_name }}"
+
+    if: true # workarround for test
+    needs: test
+
+    uses: ./.github/workflows/terraform-apply.yaml
+    with:
+      working_directory: "./terraform"
+
+    secrets: inherit
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+  # Job3
+  react:
+    name: "REACT app"
+    needs:
+      - infra
+      - test
+
+    uses: ./.github/workflows/react.yaml
+    with:
+      working_directory: "./apps/react/webapp"
+      root_bucket_name: ${{ needs.infra.outputs.root_bucket_name }}
+      static_bucket_name: ${{ needs.infra.outputs.static_bucket_name }}
+      aws_account_id: ${{ needs.infra.outputs.aws_account_id }}
+
+    secrets: inherit
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+  # Job4
+  post:
+    name: "Results"
+    needs: react
+    if: true
+
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - run: |
+          echo "Pipeline finished!" | tee -a $GITHUB_STEP_SUMMARY
