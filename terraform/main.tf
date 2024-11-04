@@ -22,7 +22,6 @@ module "app-root-bucket" {
   application_tags = try(module.resource-group.aws_application_tag, {})
 }
 
-
 module "app-static-bucket" {
   providers           = { aws = aws.project }
   source              = "./modules/bucket"
@@ -43,6 +42,7 @@ module "cloudfront" {
   # Set resource manager tags(experimental)
   aws_application_tags = module.resource-group.aws_application_tag
 
+  # 2ref: transform to list or move bucket creation routine inside of module
   # root backet with application
   root_bucket_domain_name = module.app-root-bucket.aws_bucket_regional_domain_name
 
