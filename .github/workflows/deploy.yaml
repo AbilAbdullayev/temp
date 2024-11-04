@@ -70,9 +70,9 @@ jobs:
     uses: ./.github/workflows/react.yaml
     with:
       working_directory: "./apps/react/webapp"
+      aws_account_id: ${{ needs.infra.outputs.account_id }}
       root_bucket_name: ${{ needs.infra.outputs.root_bucket_name }}
       static_bucket_name: ${{ needs.infra.outputs.static_bucket_name }}
-      aws_account_id: ${{ needs.infra.outputs.aws_account_id }}
 
     secrets: inherit
     permissions:

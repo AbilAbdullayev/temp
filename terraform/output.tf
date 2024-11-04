@@ -1,6 +1,6 @@
 output "aws_account_id" {
   value       = try(module.resource-group.aws_account_id, null)
-  sensitive   = false
+  sensitive   = true
   description = "AWS Project account ID"
   depends_on  = [module.resource-group]
 }

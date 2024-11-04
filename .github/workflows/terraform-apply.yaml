@@ -9,22 +9,19 @@ on:
       working_directory:
         required: true
         type: string
-      aws_account:
-        required: true
-        type: string
     outputs:
-      aws_account_id:
+      account_id:
         description: "AWS Project account ID"
         value: ${{ jobs.terraform.outputs.account_id }}
       root_bucket_name:
         description: "S3 bucket name"
-        value: ${{ jobs.terraform.outputs.bucket_name }}
+        value: ${{ jobs.terraform.outputs.root_bucket_name }}
       static_bucket_name:
         description: "S3 bucket name"
-        value: ${{ jobs.terraform.outputs.bucket_name }}
+        value: ${{ jobs.terraform.outputs.static_bucket_name }}
 
 env:
-  AWS_ACCOUNT: ${{ input.aws_account }}
+  AWS_ACCOUNT: ${{ secrets.AWS_ACCOUNT_INFRA }}
   TF_WORKSPACE: ${{ github.ref_name }}
 
 jobs:
@@ -38,7 +35,7 @@ jobs:
 
     # Job artifacts
     outputs:
-      account_id: ${{ steps.account_id.outputs.account_id }}
+      account_id: ${{ steps.aws_account_id.outputs.account_id }}
       root_bucket_name: ${{ steps.root_bucket_name.outputs.bucket_name }}
       static_bucket_name: ${{ steps.static_bucket_name.outputs.bucket_name }}
 
@@ -59,7 +56,11 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init
+        run: >
+          terraform init
+          -backend-config="bucket=${{ secrets.AWS_PROJECT_STATEFILE_BUCKET }}"
+          -backend-config="region=${{ vars.AWS_REGION_INFRA }}"
+          -backend-config="key=terraform.tfstate"
 
       - name: Terraform Format(linter)
         continue-on-error: false
@@ -74,20 +75,24 @@ jobs:
       - name: Get root bucket name
         id: root_bucket_name
         run: |
-          NAME=$(terraform output -raw aws_root_bucket_name)
+          NAME=$(terraform output -raw root_bucket_name)
           echo "Bucket name for public contents is ${NAME}" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "bucket_name=${NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Get static bucket name
         id: static_bucket_name
         run: |
-          NAME=$(terraform output -raw aws_static_bucket_name)
-          echo "Bucket name for static content is ${NAME}" >> "$GITHUB_STEP_SUMMARY"
-          echo "::set-output name=bucket_name::$NAME"
+          NAME=$(terraform output -raw static_bucket_name)
+          echo "Bucket name for static content is ${NAME}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "bucket_name=${NAME}" >> "$GITHUB_OUTPUT"
+          # echo "::set-output name=bucket_name::$NAME"
 
       - name: Get account ID
         id: aws_account_id
         run: |
+          # Account ID
           AID=$(terraform output -raw aws_account_id)
-          echo "::add-mask::$AID"
-          echo "::set-output name=account_id::$AID"
+          echo "Account ID is ${AID}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "account_id=${AID}" >> "$GITHUB_OUTPUT"
+          # echo "::add-mask::$AID"
+          # echo "::set-output name=account_id::$AID"

@@ -6,13 +6,13 @@ on:
       working_directory:
         required: true
         type: string
+      aws_account_id:
+        required: true
+        type: string
       root_bucket_name:
         required: true
         type: string
       static_bucket_name:
-        required: true
-        type: string
-      aws_account_id:
         required: true
         type: string
 
@@ -33,7 +33,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           audience: ${{ vars.AUDIENCE }}
-          aws-region: ${{ vars.AWS_CORE_REGION }}
+          aws-region: ${{ vars.AWS_REGION_INFRA }}
           role-to-assume: ${{ secrets.AWS_PRINCIPAL_ROLE_INFRA }}
           retry-max-attempts: 5
           mask-aws-account-id: "no"
@@ -58,7 +58,9 @@ jobs:
       - name: Deploy to AWS S3
         if: success()
         run: |
-          set -e
+          # Upload files to bukets
+          set +e
+          echo "Account ID: ${{ inputs.aws_account_id }}" | tee -a $GITHUB_STEP_SUMMARY
           eval $(aws sts assume-role \
             --role-arn arn:aws:iam::${{ inputs.aws_account_id }}:role/projectTerraformAdminRole \
             --role-session-name=GitHubActions \
